@@ -181,7 +181,41 @@ public class ServerConfigure {
         }, SecurityWebFiltersOrder.SERVER_REQUEST_CACHE);
       ```
 
-    </details>    
+    </details>
+    <details>
+      <summary>
+        Context <a href="https://engineering.linecorp.com/ko/blog/hello-armeria-bye-spring/">Propagation</a>
+      </summary>
+
+      - 기존 Spring MVC는 Context 정보들은 ThreadLocal로 관리하는데 1 요청당 1개의 스레드를 사용하기 때문에 컨텍스트 유지가 가능
+      - Netty기반 프레임워크는 eventloop 스레드가 다수의 요청을 처리하는 방식이기 때문에 Threadlocal 방식의 Context들을 처리가 불가능
+      - Request 처리가 완료 될 때까지 이벤트루프 스레드의 스위칭이 일어나도 Context를 유지하는 방법이 필요함
+      - 앞서 설계 아이디어가 리퀘스트 처리 할 때 컨텍스트를 가지고 있는 이벤트 루프를 계속 프로세스 처리 하도록 요청시키면 되지 않을까란 생각을 가지고 있으나 외부 변수나 파악하지 못한 라이브러리 로직에 의해 스레드가 임의로 변경 될 수 있다는 걸 확인
+      - 스레드 스위칭을 컨트롤 하기엔 너무 변수가 많기 때문에 각 컨텍스트 정보를 Copy-On-Write 하는 방식으로 전파하는 방법을 사용
+      - 기존 mvc security 말고 webflux용 security는 기본적으로 `ReactiveSecurityContextHolder`로 전파된 security context를 전역 접근 할 수 있다.
+      
+      > <details>
+      > <summary>기본 원리</summary>
+      >
+      >```java
+      >String key = "message";
+      >Mono<String> r = Mono.just("Hello")
+      >  .flatMap(s -> Mono.deferContextual(ctx ->
+      >   Mono.just(s + " " + ctx.get(key))))
+      >.contextWrite(ctx -> ctx.put(key, "World"));
+      >```
+      ></details>
+
+      > <details>
+      > <summary> Armeria Context Propagation Utility</summary>
+      >
+      >```java
+      >RequestContextHooks.enable();
+      >```
+      ></details>
+      
+
+    </details>
     
     <details>
       <summary>
