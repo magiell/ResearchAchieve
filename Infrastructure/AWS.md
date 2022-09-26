@@ -3,6 +3,7 @@
 ### Index
 * [AWS ECS 컨테이너 멀티포트 연결](#AWS-ECS-Service에서-컨테이너의-포트를-2개-이상-열어보자)
 * [AWS에서 Route53, Loadbalancer 없이 서비스를 찾는 법](#AWS-Cloud-Map-도입)
+* [ECS의 서비스 컨테이너에 ssh 처럼 접속해보자](#Fargate로-돌아가는-서비스-컨테이너에-접속하는-방법)
 
 ---
 #### AWS ECS Service에서 컨테이너의 포트를 2개 이상 열어보자
@@ -60,3 +61,57 @@
 - 예를 들어 cloudmap에서 echoservice라는 서비스 이름에 네임스페이스는 domaina라는 네임스페이스면 해당 서비스의 네임서버는 echoservice.domaina가 된다.
 - `nslookup echoservice.domaina`로 DNS 쿼리가 가능
 - 이렇게 하면 load balancer 서비스를 사용 하지 않고 서비스 관리 및 검색이 가능
+
+#### Fargate로 돌아가는 서비스 컨테이너에 접속하는 방법
+- ec2로 호스트 노드를 띄울 경우 EC2 -> ssh 접속 -> docker attach로 붙을 수 있다.
+- fargate의 경우 호스트 노드를 aws에서 직접 관리하기 때문에 호스트 노드의 주소를 모르기 때문에 접속을 하지 못한다.
+- 컨테이너에 sshd를 설치 & 세팅하고 접속이 가능하지만 그만큼 이미지 크기 및 빌드의 시간 코스트가 발생
+- 개인적인 생각으론 컨테이너 자체에 접근해야 하는 게 마이크로서비스를 사용하는 기본 이데올로기에 반한다고 생각함 -> 컨테이너가 하는 기능이 복잡해지면 모노리스랑 별 다를 바가 없다. (로그를 파일로 남기고 서비스 기능도 해야하고)
+- 모노리스 시스템에서 문제가 생기면 전체가 문제가 생기기 때문에 들어가서 무슨 문제인지 봐야하지만 컨테이너는 문제가 생기면 새롭게 컨테이너를 띄우고 비정상 컨테이너를 내리기만 하면 된다. (오케스트레이션에게 맡기자) 이렇게 하지 않으면 틀린게 아니라 굳이 관리해준다는데 내가 일을 벌리자는 주의는 아니라서 그렇다.
+- 하지만 개발 중의 컨테이너의 정상동작과 테스트를 하기 위한 경우엔 간혹 앱 기동 스크립트가 안 돌아간다는지 등의 확인이 필요한 경우에 컨테이너에 접속해야 한다. (물론 기동 자체를 안하면 바로 종료지만..)
+- ecs 서비스에 접속하기 위해서는 ECS execute-command 옵션을 켜줘야한다 (aws-cli)로 해당 서비스가 옵션이 켜져있는지 확인하고 서비스 수정을 하거나 새 서비스를 만들 때 옵션을 켜고 만들어야한다.
+- 서비스 확인 커맨드
+    ```bash
+    aws ecs describe-tasks --cluster cluster-name --tasks task-id
+    ```
+    ```json
+    {
+    "tasks": [
+        {
+            ...
+            "containers": [
+                {
+                    ...
+                    "managedAgents": [
+                        {
+                            "lastStartedAt": "2021-03-01T14:49:44.574000-06:00",
+                            "name": "ExecuteCommandAgent",
+                            "lastStatus": "RUNNING"
+                        }
+                    ]
+                }
+            ],
+            ...
+            "enableExecuteCommand": true, // <-- 해당 플래그
+            ...
+        }
+    ]
+    }
+    ```
+- 서비스 생성 커맨드
+    ```bash
+    aws ecs create-service \
+    --cluster cluster-name \
+    --task-definition task-definition-name \
+    --enable-execute-command \
+    --service-name service-name \
+    --desired-count 1
+    ```
+- 접속 커맨드
+    ```bash
+    aws ecs execute-command --cluster cluster-name \
+    --task task-id \
+    --container container-name \
+    --interactive \
+    --command "/bin/sh" # 물론 bash를 지원하면 bash로 해도 됨
+    ```
