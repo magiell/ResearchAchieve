@@ -4,7 +4,7 @@
 * [AWS ECS 컨테이너 멀티포트 연결](#AWS-ECS-Service에서-컨테이너의-포트를-2개-이상-열어보자)
 * [AWS에서 Route53, Loadbalancer 없이 서비스를 찾는 법](#AWS-Cloud-Map-도입)
 * [ECS의 서비스 컨테이너에 ssh 처럼 접속해보자](#Fargate로-돌아가는-서비스-컨테이너에-접속하는-방법)
-* [Spring Cloud Config Volume을 S3로]()
+* [Config Server 구축 대신 AWS Parameter Store 사용](#환경변수-파라미터-관리용-aws-parameter-store를-써보자)
 
 ---
 #### AWS ECS Service에서 컨테이너의 포트를 2개 이상 열어보자
@@ -116,3 +116,36 @@
     --interactive \
     --command "/bin/sh" # 물론 bash를 지원하면 bash로 해도 됨
     ```
+
+#### 환경변수-파라미터 관리용 AWS Parameter Store를 써보자
+- 개발 서비스가 점점 복잡해지면 복잡해질수록 관리해야하는 변수들이 늘어나는게 현실
+- 클라우드 환경 + 마이크로 서비스 일수록 변수관리등의 실수가 벌어질 수 있다.
+- Config Server 등의 변수 관리 서버를 두고 관리가 용이하게 하도록 도입하고 있는 추세
+- Server 구성을 위한 약간의 코스트도 귀찮은데 클라우드(AWS)를 쓴다면 Parameter Store 서비스를 이용해서 간단하게 구성
+- Spring 스택을 사용한다면 Spring Cloud에 있는 Config Server로 구성할 수 있지만 [awspring](https://docs.awspring.io/spring-cloud-aws/docs/2.4.1/reference/html/index.html#integrating-your-spring-cloud-application-with-the-aws-parameter-store) 라이브러리를 사용하여 클라우드 인프라 서비스를 쉽게 통합하여 사용할 수 있다.
+- <details><summary><b>yml example</b></summary>
+
+    ```yml
+    aws:
+    paramstore:
+        prefix: /prefix  # 파라미터 prefix
+        fail-fast: true  # 못 가져오면 기동 실패
+        profile-separator: "-" # 이름과 프로파일을 나누는 seperator
+        name: testServer # 이름
+    spring:    
+    application:
+        name: testServer
+    config:
+        activate:
+          on-profile: <profile>
+        import: "aws-parameterstore:" #파라미터스토어에서 import 받겠다
+    datasource:
+        driver-class-name: com.mysql.cj.jdbc.Driver
+        url: <DatasourceURI>
+        username: <USERNAME>
+        password: ${db.password}
+    ```
+</details>
+
+- 위 yml 파일이 가르키는 parameter store의 name은 `/prefix/testServer-{profile}/db.password`가 된다
+- 템플릿처럼 바꾸면 `/{prefix}/{name}{seperator}{profile}/{tag}`
