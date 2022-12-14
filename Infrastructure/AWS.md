@@ -149,3 +149,24 @@
 
 - 위 yml 파일이 가르키는 parameter store의 name은 `/prefix/testServer-{profile}/db.password`가 된다
 - 템플릿처럼 바꾸면 `/{prefix}/{name}{seperator}{profile}/{tag}`
+
+#### 서비스 인프라 변경에 대한 고민 (설계고민)
+- <details><summary><b>기존 서비스 구조</b></summary> 
+    
+    ![image](https://user-images.githubusercontent.com/10514403/207530389-f6eb9ffb-edc0-450f-8839-a2dad29353f8.png)
+    - 키 기준의 데이터를 만들어 주기 위해 테이블을 분할하여 생성 하는 작업이 있다.
+    - 각 서비스 마다 필요로 하는 고정 된 데이터 셋을 넣어주고 조회하도록 하기 때문에 비슷한 방식을 고반복하는 구조 (생산성이 없는 작업 코스트)
+    - 데이터 확장의 유연성이 떨어지는 것 같음 -> pivot하는 테이블이 늘어난다 or 줄어든다.
+</details>
+    
+- <details><summary><b>변경 예상 서비스 구조</b></summary> 
+    
+    ![image](https://user-images.githubusercontent.com/10514403/207531059-6febfa3b-e593-4b00-82b5-8ef30aec29f9.png)
+    - 검색 엔진에 데이터를 집어 넣고 직접 데이터를 검색 할 수 있도록
+    - 분산처리 결과 데이터와 검색 데이터를 분리 (유효 데이터, 정크 데이터 필터링 / 정제된 데이터를 다양한 관점으로 검색 )
+</details>
+
+- 생각해 봄 직한 포인트
+    - 누적 업데이트 테이블에 대한 핸들링
+    - 조인 검색에 대한 검색 속도
+    - 이전 방식보다 관리 포인트가 줄어드는지?
