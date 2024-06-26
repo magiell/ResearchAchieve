@@ -1,0 +1,35 @@
+##  데이터베이스 관련 경험 기록
+
+## Index
+- [피벗 함수가 없을 때는?](#Table-Pivot-(MySQL))
+- [쿼리를 할 때 인덱스를 설정하는 기준](#테이블-인덱스를-만드는-기준)
+- [데이터베이스에서 Null](#컬럼에-Null-값은-지양-해야하는-이유)
+----
+#### Table Pivot (MySQL)
+-  데이터 정제 작업을 하면서 행 데이터를 열로 바꿔야 하는 상황이 많이 발생한다.
+- 다른 RDBMS에선 자체적으로 지원하는 함수가 지원되지만 Mysql은 직접 작성해야 하므로 방법이 여러가지가 생긴다.
+- 쉬운 방식으로 하는 건 Max, IF 를 이용한 Select
+```mysql
+-- 시험 정보 테이블이 있다면?
+create table exam(name varchar(10), subject varchar(10), score int);
+
+-- 사람 기준으로 피벗하고 싶다면
+select 
+	name, 
+	max(if(subject = '국어', score)) as '국어',
+	max(if(subject = '영어', score)) as '영어',
+	max(if(subject = '수학', score)) as '수학'
+from exam
+group by name;
+```
+
+#### 테이블 인덱스를 만드는 기준
+- 조회를 할 때 where 절로 가장 많이 필터링 하는 컬럼을 가급적 인덱스 첫번째로 지정한다
+- 조회 쿼리를 만들 때 복합 인덱스 '순서'에 맞게 사용 (Index Access -> Index Filter -> Table Filter)
+- 복합 인덱스 컬럼을 사용할 때 복합 컬럼 첫번째를 사용하지 않는다면 인덱스를 타지 않는다
+- 인덱스 컬럼으로 지정하여도 Range로 사용하는 경우 Index Filter로 사용된다
+
+#### 컬럼에 Null 값은 지양 해야하는 이유
+- DB에서 Null에 대한 연산 문제가 발생하는데 Null 값이 발생한 이후부턴 무슨 연산을 진행하던 Null이 되기 때문 (1+ Null = Null)
+- 인덱스 문제도 Null에 대한 처리는 DB엔진마다 각각 다르다
+- 데이터 Null 값의 의미가 혼동 될 수 있다 (데이터 X, 0, 빈 문자열, 잘못된 수식 결과 등등)
